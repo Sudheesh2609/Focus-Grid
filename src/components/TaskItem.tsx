@@ -1,7 +1,6 @@
-
 import { useState, useRef, useEffect } from "react";
 import { Task, TaskQuadrant, ActiveRecallCard } from "@/types/task";
-import { Pencil, Trash2, Timer as TimerIcon, Brain, Shuffle, Clock, BookOpen } from "lucide-react";
+import { Pencil, Trash2, Timer as TimerIcon, Brain, Shuffle, Clock, BookOpen, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +8,8 @@ import TaskForm from "@/components/TaskForm";
 import PomodoroTimer from "@/components/PomodoroTimer";
 import ActiveRecall from "@/components/ActiveRecall";
 import { format, isAfter } from "date-fns";
+import { calculateTaskPoints, getPointsColor } from "@/utils/points";
+import { useToast } from "@/components/ui/use-toast";
 
 interface TaskItemProps {
   task: Task;
@@ -18,6 +19,7 @@ interface TaskItemProps {
 }
 
 const TaskItem = ({ task, onUpdate, onDelete, quadrant }: TaskItemProps) => {
+  const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [showTimer, setShowTimer] = useState(false);
   const [showActiveRecall, setShowActiveRecall] = useState(false);
@@ -70,18 +72,22 @@ const TaskItem = ({ task, onUpdate, onDelete, quadrant }: TaskItemProps) => {
   const handleToggleComplete = () => {
     playSound(checkSoundRef);
     
+    const now = new Date();
+    const points = calculateTaskPoints(task);
+    
     // If this is a spaced repetition task and marked as complete
     if (task.spacedRepetition && !task.completed) {
       // Calculate new interval using a simple spaced repetition algorithm
       // Double the interval each successful review
       const newInterval = task.spacedRepetition.interval * 2;
-      const now = new Date();
       const nextReview = new Date();
       nextReview.setDate(now.getDate() + newInterval);
       
       onUpdate({
         ...task,
         completed: true,
+        completedAt: now.toISOString(),
+        points: points,
         spacedRepetition: {
           ...task.spacedRepetition,
           interval: newInterval,
@@ -90,11 +96,27 @@ const TaskItem = ({ task, onUpdate, onDelete, quadrant }: TaskItemProps) => {
           repetitionCount: task.spacedRepetition.repetitionCount + 1
         }
       });
+      
+      // Show toast with points earned
+      toast({
+        title: `+${points} Points!`,
+        description: "Great job completing your spaced repetition task!",
+      });
     } else {
       onUpdate({
         ...task,
         completed: !task.completed,
+        completedAt: !task.completed ? now.toISOString() : undefined,
+        points: !task.completed ? points : undefined,
       });
+      
+      // Only show toast when completing a task, not when uncompleting
+      if (!task.completed) {
+        toast({
+          title: `+${points} Points!`,
+          description: "Task completed successfully!",
+        });
+      }
     }
   };
 
@@ -220,6 +242,13 @@ const TaskItem = ({ task, onUpdate, onDelete, quadrant }: TaskItemProps) => {
               <Badge variant="outline" className="text-xs px-1 py-0 bg-indigo-50 border-indigo-200 flex items-center gap-0.5">
                 <BookOpen className="h-2.5 w-2.5" />
                 <span>Cards: {task.activeRecall.length}</span>
+              </Badge>
+            )}
+            
+            {task.completed && task.points && (
+              <Badge variant="outline" className={`text-xs px-1 py-0 bg-amber-50 border-amber-200 flex items-center gap-0.5 ${getPointsColor(task.points)}`}>
+                <Trophy className="h-2.5 w-2.5" />
+                <span>{task.points} pts</span>
               </Badge>
             )}
           </div>

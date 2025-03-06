@@ -38,10 +38,22 @@ export interface Task {
   quadrant: TaskQuadrant;
   completed: boolean;
   createdAt: string;
+  completedAt?: string; // New field to track when a task was completed
   pomodoro?: PomodoroSettings;
   spacedRepetition?: SpacedRepetition;
   interleaving?: boolean; // Whether this task should be interleaved with others
   subject?: string; // Subject category for interleaving
   activeRecall?: ActiveRecallCard[]; // Cards for active recall practice
-  recurrence?: RecurrenceSettings; // New recurring task settings
+  recurrence?: RecurrenceSettings; // Recurring task settings
+  points?: number; // Points awarded for completing the task
+}
+
+export type AnalysisPeriod = 'daily' | 'weekly' | 'monthly' | 'yearly';
+
+export interface TaskAnalytics {
+  completedTasks: number;
+  pendingTasks: number;
+  totalPoints: number;
+  pointsByQuadrant: Record<TaskQuadrant, number>;
+  tasksByQuadrant: Record<TaskQuadrant, number>;
 }

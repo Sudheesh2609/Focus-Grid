@@ -2,11 +2,14 @@
 import { useState, useEffect } from "react";
 import Header from "@/components/Header";
 import EisenhowerMatrix from "@/components/EisenhowerMatrix";
+import TaskAnalysis from "@/components/TaskAnalysis";
 import { Task, TaskQuadrant } from "@/types/task";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
-import { Brain, Shuffle, Repeat } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Brain, Shuffle, Repeat, BarChart3 } from "lucide-react";
 import { isAfter, parseISO, addDays, addWeeks, addMonths } from "date-fns";
+import { calculateTaskPoints } from "@/utils/points";
 
 const Index = () => {
   const { toast } = useToast();
@@ -19,10 +22,20 @@ const Index = () => {
   const [showDueOnly, setShowDueOnly] = useState(false);
   const [interleavingMode, setInterleavingMode] = useState(false);
   const [showRecurringOnly, setShowRecurringOnly] = useState(false);
+  const [activeTab, setActiveTab] = useState("matrix");
+  const [totalPoints, setTotalPoints] = useState(0);
   
   // Save to localStorage whenever tasks change
   useEffect(() => {
     localStorage.setItem("eisenhowerTasks", JSON.stringify(tasks));
+  }, [tasks]);
+  
+  // Calculate total points
+  useEffect(() => {
+    const points = tasks.reduce((total, task) => {
+      return total + (task.points || 0);
+    }, 0);
+    setTotalPoints(points);
   }, [tasks]);
   
   // Check for recurring tasks that need to be recreated
@@ -239,66 +252,103 @@ const Index = () => {
     <div className="min-h-screen bg-gray-50">
       <Header />
       <main className="container mx-auto px-4 py-6">
-        <div className="flex flex-wrap gap-2 mb-6 justify-between items-center">
-          <div className="flex flex-wrap gap-2">
-            <Button
-              size="sm"
-              variant={showDueOnly ? "default" : "outline"}
-              onClick={() => {
-                setShowDueOnly(!showDueOnly);
-                if (!showDueOnly) setShowRecurringOnly(false);
-              }}
-              className="flex items-center gap-1"
-            >
-              <Brain className="h-4 w-4" />
-              <span>Due for Review ({dueTasksCount})</span>
-            </Button>
+        <div className="flex items-center justify-between mb-6">
+          <Tabs 
+            value={activeTab} 
+            onValueChange={setActiveTab}
+            className="w-full"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <TabsList>
+                <TabsTrigger value="matrix" className="flex items-center gap-1">
+                  <div className="grid grid-cols-2 grid-rows-2 w-4 h-4 gap-0.5">
+                    <div className="bg-matrix-q1 rounded-sm"></div>
+                    <div className="bg-matrix-q2 rounded-sm"></div>
+                    <div className="bg-matrix-q3 rounded-sm"></div>
+                    <div className="bg-matrix-q4 rounded-sm"></div>
+                  </div>
+                  <span>Eisenhower Matrix</span>
+                </TabsTrigger>
+                <TabsTrigger value="analysis" className="flex items-center gap-1">
+                  <BarChart3 className="h-4 w-4" />
+                  <span>Analysis</span>
+                </TabsTrigger>
+              </TabsList>
+              
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">Total Points:</span>
+                <span className="text-lg font-bold text-amber-600">{totalPoints}</span>
+              </div>
+            </div>
             
-            <Button
-              size="sm"
-              variant={interleavingMode ? "default" : "outline"}
-              onClick={() => setInterleavingMode(!interleavingMode)}
-              className="flex items-center gap-1"
-            >
-              <Shuffle className="h-4 w-4" />
-              <span>Interleaving Mode</span>
-            </Button>
+            <TabsContent value="matrix">
+              <div className="flex flex-wrap gap-2 mb-6 justify-between items-center">
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant={showDueOnly ? "default" : "outline"}
+                    onClick={() => {
+                      setShowDueOnly(!showDueOnly);
+                      if (!showDueOnly) setShowRecurringOnly(false);
+                    }}
+                    className="flex items-center gap-1"
+                  >
+                    <Brain className="h-4 w-4" />
+                    <span>Due for Review ({dueTasksCount})</span>
+                  </Button>
+                  
+                  <Button
+                    size="sm"
+                    variant={interleavingMode ? "default" : "outline"}
+                    onClick={() => setInterleavingMode(!interleavingMode)}
+                    className="flex items-center gap-1"
+                  >
+                    <Shuffle className="h-4 w-4" />
+                    <span>Interleaving Mode</span>
+                  </Button>
+                  
+                  <Button
+                    size="sm"
+                    variant={showRecurringOnly ? "default" : "outline"}
+                    onClick={() => {
+                      setShowRecurringOnly(!showRecurringOnly);
+                      if (!showRecurringOnly) setShowDueOnly(false);
+                    }}
+                    className="flex items-center gap-1"
+                  >
+                    <Repeat className="h-4 w-4" />
+                    <span>Recurring Tasks ({recurringTasksCount})</span>
+                  </Button>
+                </div>
+                
+                {(showDueOnly || interleavingMode || showRecurringOnly) && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setShowDueOnly(false);
+                      setInterleavingMode(false);
+                      setShowRecurringOnly(false);
+                    }}
+                  >
+                    Reset Filters
+                  </Button>
+                )}
+              </div>
+              
+              <EisenhowerMatrix 
+                tasks={processedTasks} 
+                onAddTask={addTask} 
+                onUpdateTask={updateTask} 
+                onDeleteTask={deleteTask} 
+              />
+            </TabsContent>
             
-            <Button
-              size="sm"
-              variant={showRecurringOnly ? "default" : "outline"}
-              onClick={() => {
-                setShowRecurringOnly(!showRecurringOnly);
-                if (!showRecurringOnly) setShowDueOnly(false);
-              }}
-              className="flex items-center gap-1"
-            >
-              <Repeat className="h-4 w-4" />
-              <span>Recurring Tasks ({recurringTasksCount})</span>
-            </Button>
-          </div>
-          
-          {(showDueOnly || interleavingMode || showRecurringOnly) && (
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => {
-                setShowDueOnly(false);
-                setInterleavingMode(false);
-                setShowRecurringOnly(false);
-              }}
-            >
-              Reset Filters
-            </Button>
-          )}
+            <TabsContent value="analysis">
+              <TaskAnalysis tasks={tasks} />
+            </TabsContent>
+          </Tabs>
         </div>
-        
-        <EisenhowerMatrix 
-          tasks={processedTasks} 
-          onAddTask={addTask} 
-          onUpdateTask={updateTask} 
-          onDeleteTask={deleteTask} 
-        />
       </main>
     </div>
   );
