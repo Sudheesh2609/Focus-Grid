@@ -1,5 +1,6 @@
+
 import { useState, useRef, useEffect } from "react";
-import { Task, TaskQuadrant } from "@/types/task";
+import { Task, TaskQuadrant, ActiveRecallCard } from "@/types/task";
 import { Pencil, Trash2, Timer as TimerIcon, Brain, Shuffle, Clock, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
