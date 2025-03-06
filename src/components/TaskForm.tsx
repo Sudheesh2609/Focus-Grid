@@ -1,12 +1,25 @@
 import { useState } from "react";
-import { Task, PomodoroSettings, SpacedRepetition, ActiveRecallCard } from "@/types/task";
+import { Task, PomodoroSettings, SpacedRepetition, RecurrenceSettings, RecurrenceInterval } from "@/types/task";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Timer, Brain, Shuffle, BookOpen } from "lucide-react";
+import { Timer, Brain, Shuffle, BookOpen, Repeat, ChevronDown } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { addDays, format } from "date-fns";
+import { addDays, format, addWeeks, addMonths } from "date-fns";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface TaskFormProps {
   task?: Task;
@@ -28,6 +41,13 @@ const defaultSpacedRepetition: SpacedRepetition = {
   repetitionCount: 0,
 };
 
+const defaultRecurrenceSettings: RecurrenceSettings = {
+  enabled: true,
+  interval: 'daily',
+  nextOccurrence: new Date().toISOString(),
+  lastCompleted: null,
+};
+
 const TaskForm = ({ task, onSubmit, onCancel }: TaskFormProps) => {
   const [title, setTitle] = useState(task?.title || "");
   const [description, setDescription] = useState(task?.description || "");
@@ -43,6 +63,13 @@ const TaskForm = ({ task, onSubmit, onCancel }: TaskFormProps) => {
     task?.spacedRepetition || defaultSpacedRepetition
   );
   
+  // Recurrence settings
+  const [showRecurrence, setShowRecurrence] = useState(!!task?.recurrence);
+  const [recurrenceSettings, setRecurrenceSettings] = useState<RecurrenceSettings>(
+    task?.recurrence || defaultRecurrenceSettings
+  );
+  const [customDays, setCustomDays] = useState(task?.recurrence?.customDays?.toString() || "7");
+  
   // Interleaving setting
   const [interleaving, setInterleaving] = useState(task?.interleaving || false);
   
@@ -50,7 +77,7 @@ const TaskForm = ({ task, onSubmit, onCancel }: TaskFormProps) => {
   const [showActiveRecall, setShowActiveRecall] = useState(!!task?.activeRecall);
   const [activeRecallQuestion, setActiveRecallQuestion] = useState("");
   const [activeRecallAnswer, setActiveRecallAnswer] = useState("");
-  const [activeRecallCards, setActiveRecallCards] = useState<ActiveRecallCard[]>(
+  const [activeRecallCards, setActiveRecallCards] = useState<any[]>(
     task?.activeRecall || []
   );
 
@@ -63,6 +90,29 @@ const TaskForm = ({ task, onSubmit, onCancel }: TaskFormProps) => {
     const nextReviewDate = showSpacedRepetition 
       ? addDays(now, spacedRepetition.interval).toISOString() 
       : null;
+    
+    // Calculate next occurrence date based on recurrence interval
+    let nextOccurrenceDate = now;
+    if (showRecurrence) {
+      switch (recurrenceSettings.interval) {
+        case 'daily':
+          nextOccurrenceDate = addDays(now, 1);
+          break;
+        case 'weekly':
+          nextOccurrenceDate = addWeeks(now, 1);
+          break;
+        case 'biweekly':
+          nextOccurrenceDate = addWeeks(now, 2);
+          break;
+        case 'monthly':
+          nextOccurrenceDate = addMonths(now, 1);
+          break;
+        case 'custom':
+          const days = parseInt(customDays, 10) || 7;
+          nextOccurrenceDate = addDays(now, days);
+          break;
+      }
+    }
     
     onSubmit({
       title: title.trim(),
@@ -78,6 +128,11 @@ const TaskForm = ({ task, onSubmit, onCancel }: TaskFormProps) => {
       } : undefined,
       interleaving: interleaving || undefined,
       activeRecall: showActiveRecall && activeRecallCards.length > 0 ? activeRecallCards : undefined,
+      recurrence: showRecurrence ? {
+        ...recurrenceSettings,
+        nextOccurrence: nextOccurrenceDate.toISOString(),
+        customDays: recurrenceSettings.interval === 'custom' ? parseInt(customDays, 10) || 7 : undefined,
+      } : undefined,
     });
     
     setTitle("");
@@ -85,9 +140,11 @@ const TaskForm = ({ task, onSubmit, onCancel }: TaskFormProps) => {
     setSubject("");
     setPomodoroSettings(defaultPomodoroSettings);
     setSpacedRepetition(defaultSpacedRepetition);
+    setRecurrenceSettings(defaultRecurrenceSettings);
     setInterleaving(false);
     setShowPomodoroSettings(false);
     setShowSpacedRepetition(false);
+    setShowRecurrence(false);
     setShowActiveRecall(false);
     setActiveRecallCards([]);
   };
@@ -112,6 +169,13 @@ const TaskForm = ({ task, onSubmit, onCancel }: TaskFormProps) => {
     });
   };
   
+  const handleRecurrenceIntervalChange = (value: RecurrenceInterval) => {
+    setRecurrenceSettings({
+      ...recurrenceSettings,
+      interval: value,
+    });
+  };
+  
   const handleAddActiveRecallCard = () => {
     if (!activeRecallQuestion.trim() || !activeRecallAnswer.trim()) return;
     
@@ -132,6 +196,33 @@ const TaskForm = ({ task, onSubmit, onCancel }: TaskFormProps) => {
     const newCards = [...activeRecallCards];
     newCards.splice(index, 1);
     setActiveRecallCards(newCards);
+  };
+
+  // Function to generate preview text for the next occurrence
+  const getNextOccurrenceText = () => {
+    const now = new Date();
+    let nextDate;
+    
+    switch (recurrenceSettings.interval) {
+      case 'daily':
+        nextDate = addDays(now, 1);
+        return `Tomorrow (${format(nextDate, 'MMM d, yyyy')})`;
+      case 'weekly':
+        nextDate = addWeeks(now, 1);
+        return `Next week (${format(nextDate, 'MMM d, yyyy')})`;
+      case 'biweekly':
+        nextDate = addWeeks(now, 2);
+        return `In two weeks (${format(nextDate, 'MMM d, yyyy')})`;
+      case 'monthly':
+        nextDate = addMonths(now, 1);
+        return `Next month (${format(nextDate, 'MMM d, yyyy')})`;
+      case 'custom':
+        const days = parseInt(customDays, 10) || 7;
+        nextDate = addDays(now, days);
+        return `In ${days} days (${format(nextDate, 'MMM d, yyyy')})`;
+      default:
+        return 'Unknown';
+    }
   };
 
   return (
@@ -181,6 +272,17 @@ const TaskForm = ({ task, onSubmit, onCancel }: TaskFormProps) => {
           >
             <Brain className="h-3.5 w-3.5" />
             {showSpacedRepetition ? "Hide Spaced Repetition" : "Add Spaced Repetition"}
+          </Button>
+          
+          <Button 
+            type="button" 
+            variant="ghost" 
+            size="sm"
+            className="text-xs flex items-center gap-1"
+            onClick={() => setShowRecurrence(!showRecurrence)}
+          >
+            <Repeat className="h-3.5 w-3.5" />
+            {showRecurrence ? "Hide Recurrence" : "Add Recurrence"}
           </Button>
           
           <Button 
@@ -265,6 +367,48 @@ const TaskForm = ({ task, onSubmit, onCancel }: TaskFormProps) => {
             Next review: {spacedRepetition.nextReview 
               ? format(new Date(spacedRepetition.nextReview), 'MMM d, yyyy') 
               : format(addDays(new Date(), spacedRepetition.interval), 'MMM d, yyyy')}
+          </p>
+        </div>
+      )}
+      
+      {showRecurrence && (
+        <div className="p-2 bg-gray-50 rounded-md space-y-2">
+          <div className="flex items-center gap-2">
+            <Label htmlFor="recurrenceInterval" className="text-xs flex-shrink-0">Repeats:</Label>
+            <Select
+              value={recurrenceSettings.interval}
+              onValueChange={(value) => handleRecurrenceIntervalChange(value as RecurrenceInterval)}
+            >
+              <SelectTrigger className="h-8 flex-grow">
+                <SelectValue placeholder="Select frequency" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="daily">Daily</SelectItem>
+                <SelectItem value="weekly">Weekly</SelectItem>
+                <SelectItem value="biweekly">Bi-weekly</SelectItem>
+                <SelectItem value="monthly">Monthly</SelectItem>
+                <SelectItem value="custom">Custom</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          {recurrenceSettings.interval === 'custom' && (
+            <div className="flex items-center gap-2">
+              <Label htmlFor="customDays" className="text-xs">Every</Label>
+              <Input
+                id="customDays"
+                type="number"
+                min="1"
+                value={customDays}
+                onChange={(e) => setCustomDays(e.target.value)}
+                className="h-8 w-16"
+              />
+              <span className="text-xs">days</span>
+            </div>
+          )}
+          
+          <p className="text-xs text-gray-500">
+            Next occurrence: {getNextOccurrenceText()}
           </p>
         </div>
       )}

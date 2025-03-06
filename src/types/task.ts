@@ -21,6 +21,16 @@ export interface ActiveRecallCard {
   lastPerformance: 'correct' | 'incorrect' | null; // How well the student recalled this card
 }
 
+export type RecurrenceInterval = 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'custom';
+
+export interface RecurrenceSettings {
+  enabled: boolean;
+  interval: RecurrenceInterval;
+  customDays?: number; // For custom interval in days
+  nextOccurrence: string; // ISO date string
+  lastCompleted: string | null; // ISO date string
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -33,4 +43,5 @@ export interface Task {
   interleaving?: boolean; // Whether this task should be interleaved with others
   subject?: string; // Subject category for interleaving
   activeRecall?: ActiveRecallCard[]; // Cards for active recall practice
+  recurrence?: RecurrenceSettings; // New recurring task settings
 }

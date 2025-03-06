@@ -5,8 +5,8 @@ import EisenhowerMatrix from "@/components/EisenhowerMatrix";
 import { Task, TaskQuadrant } from "@/types/task";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
-import { Brain, Shuffle } from "lucide-react";
-import { isAfter } from "date-fns";
+import { Brain, Shuffle, Repeat } from "lucide-react";
+import { isAfter, parseISO, addDays, addWeeks, addMonths } from "date-fns";
 
 const Index = () => {
   const { toast } = useToast();
@@ -18,19 +18,108 @@ const Index = () => {
   
   const [showDueOnly, setShowDueOnly] = useState(false);
   const [interleavingMode, setInterleavingMode] = useState(false);
+  const [showRecurringOnly, setShowRecurringOnly] = useState(false);
   
   // Save to localStorage whenever tasks change
   useEffect(() => {
     localStorage.setItem("eisenhowerTasks", JSON.stringify(tasks));
   }, [tasks]);
   
-  // Filter for due tasks
-  const filteredTasks = tasks.filter(task => {
-    if (!showDueOnly) return true;
-    if (task.completed) return false;
-    if (!task.spacedRepetition?.nextReview) return false;
+  // Check for recurring tasks that need to be recreated
+  useEffect(() => {
+    const now = new Date();
+    const updatedTasks = [...tasks];
+    let tasksChanged = false;
     
-    return isAfter(new Date(), new Date(task.spacedRepetition.nextReview));
+    tasks.forEach((task) => {
+      // Skip if no recurrence or if task is not completed
+      if (!task.recurrence || !task.completed) return;
+      
+      const nextOccurrence = parseISO(task.recurrence.nextOccurrence);
+      
+      // If the task is completed and it's recurring, create a new instance
+      if (isAfter(now, nextOccurrence)) {
+        // Calculate the new next occurrence date
+        let newNextOccurrence = new Date();
+        
+        switch (task.recurrence.interval) {
+          case 'daily':
+            newNextOccurrence = addDays(now, 1);
+            break;
+          case 'weekly':
+            newNextOccurrence = addWeeks(now, 1);
+            break;
+          case 'biweekly':
+            newNextOccurrence = addWeeks(now, 2);
+            break;
+          case 'monthly':
+            newNextOccurrence = addMonths(now, 1);
+            break;
+          case 'custom':
+            if (task.recurrence.customDays) {
+              newNextOccurrence = addDays(now, task.recurrence.customDays);
+            } else {
+              newNextOccurrence = addDays(now, 7); // Default to weekly
+            }
+            break;
+        }
+        
+        // Create a new task instance
+        const newTask: Task = {
+          ...task,
+          id: Date.now().toString(),
+          completed: false,
+          createdAt: now.toISOString(),
+          recurrence: {
+            ...task.recurrence,
+            nextOccurrence: newNextOccurrence.toISOString(),
+            lastCompleted: now.toISOString(),
+          }
+        };
+        
+        // Update the old task's recurrence info
+        const oldTaskIndex = updatedTasks.findIndex(t => t.id === task.id);
+        if (oldTaskIndex !== -1) {
+          updatedTasks[oldTaskIndex] = {
+            ...updatedTasks[oldTaskIndex],
+            recurrence: {
+              ...updatedTasks[oldTaskIndex].recurrence!,
+              lastCompleted: now.toISOString(),
+            }
+          };
+        }
+        
+        // Add the new task
+        updatedTasks.push(newTask);
+        tasksChanged = true;
+        
+        toast({
+          title: "Recurring task created",
+          description: `"${task.title}" has been recreated based on its recurrence schedule.`,
+        });
+      }
+    });
+    
+    if (tasksChanged) {
+      setTasks(updatedTasks);
+    }
+  }, [tasks, toast]);
+  
+  // Filter for tasks based on user selection
+  const filteredTasks = tasks.filter(task => {
+    // Filter for due tasks if enabled
+    if (showDueOnly) {
+      if (task.completed) return false;
+      if (!task.spacedRepetition?.nextReview) return false;
+      return isAfter(new Date(), new Date(task.spacedRepetition.nextReview));
+    }
+    
+    // Filter for recurring tasks if enabled
+    if (showRecurringOnly) {
+      return !!task.recurrence;
+    }
+    
+    return true;
   });
 
   // Sort tasks for interleaving if enabled
@@ -142,6 +231,9 @@ const Index = () => {
     if (!task.spacedRepetition?.nextReview) return false;
     return isAfter(new Date(), new Date(task.spacedRepetition.nextReview));
   }).length;
+  
+  // Count recurring tasks
+  const recurringTasksCount = tasks.filter(task => !!task.recurrence).length;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -152,7 +244,10 @@ const Index = () => {
             <Button
               size="sm"
               variant={showDueOnly ? "default" : "outline"}
-              onClick={() => setShowDueOnly(!showDueOnly)}
+              onClick={() => {
+                setShowDueOnly(!showDueOnly);
+                if (!showDueOnly) setShowRecurringOnly(false);
+              }}
               className="flex items-center gap-1"
             >
               <Brain className="h-4 w-4" />
@@ -168,15 +263,29 @@ const Index = () => {
               <Shuffle className="h-4 w-4" />
               <span>Interleaving Mode</span>
             </Button>
+            
+            <Button
+              size="sm"
+              variant={showRecurringOnly ? "default" : "outline"}
+              onClick={() => {
+                setShowRecurringOnly(!showRecurringOnly);
+                if (!showRecurringOnly) setShowDueOnly(false);
+              }}
+              className="flex items-center gap-1"
+            >
+              <Repeat className="h-4 w-4" />
+              <span>Recurring Tasks ({recurringTasksCount})</span>
+            </Button>
           </div>
           
-          {(showDueOnly || interleavingMode) && (
+          {(showDueOnly || interleavingMode || showRecurringOnly) && (
             <Button
               size="sm"
               variant="ghost"
               onClick={() => {
                 setShowDueOnly(false);
                 setInterleavingMode(false);
+                setShowRecurringOnly(false);
               }}
             >
               Reset Filters
