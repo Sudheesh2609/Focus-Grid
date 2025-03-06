@@ -37,6 +37,8 @@ export const calculateTaskPoints = (task: Task): number => {
 };
 
 export const getPointsColor = (points: number): string => {
+  if (points >= 500) return "text-purple-600";
+  if (points >= 250) return "text-indigo-600";
   if (points >= 150) return "text-green-600";
   if (points >= 100) return "text-blue-600";
   if (points >= 50) return "text-amber-600";

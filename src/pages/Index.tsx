@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import Header from "@/components/Header";
 import EisenhowerMatrix from "@/components/EisenhowerMatrix";
@@ -7,14 +6,13 @@ import { Task, TaskQuadrant } from "@/types/task";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Brain, Shuffle, Repeat, BarChart3 } from "lucide-react";
+import { Brain, Shuffle, Repeat, BarChart3, Grid2X2 } from "lucide-react";
 import { isAfter, parseISO, addDays, addWeeks, addMonths } from "date-fns";
-import { calculateTaskPoints } from "@/utils/points";
+import { calculateTaskPoints, getPointsColor } from "@/utils/points";
 
 const Index = () => {
   const { toast } = useToast();
   const [tasks, setTasks] = useState<Task[]>(() => {
-    // Initialize with localStorage if available
     const savedTasks = localStorage.getItem("eisenhowerTasks");
     return savedTasks ? JSON.parse(savedTasks) : [];
   });
@@ -25,12 +23,10 @@ const Index = () => {
   const [activeTab, setActiveTab] = useState("matrix");
   const [totalPoints, setTotalPoints] = useState(0);
   
-  // Save to localStorage whenever tasks change
   useEffect(() => {
     localStorage.setItem("eisenhowerTasks", JSON.stringify(tasks));
   }, [tasks]);
   
-  // Calculate total points
   useEffect(() => {
     const points = tasks.reduce((total, task) => {
       return total + (task.points || 0);
@@ -38,21 +34,17 @@ const Index = () => {
     setTotalPoints(points);
   }, [tasks]);
   
-  // Check for recurring tasks that need to be recreated
   useEffect(() => {
     const now = new Date();
     const updatedTasks = [...tasks];
     let tasksChanged = false;
     
     tasks.forEach((task) => {
-      // Skip if no recurrence or if task is not completed
       if (!task.recurrence || !task.completed) return;
       
       const nextOccurrence = parseISO(task.recurrence.nextOccurrence);
       
-      // If the task is completed and it's recurring, create a new instance
       if (isAfter(now, nextOccurrence)) {
-        // Calculate the new next occurrence date
         let newNextOccurrence = new Date();
         
         switch (task.recurrence.interval) {
@@ -72,12 +64,11 @@ const Index = () => {
             if (task.recurrence.customDays) {
               newNextOccurrence = addDays(now, task.recurrence.customDays);
             } else {
-              newNextOccurrence = addDays(now, 7); // Default to weekly
+              newNextOccurrence = addDays(now, 7);
             }
             break;
         }
         
-        // Create a new task instance
         const newTask: Task = {
           ...task,
           id: Date.now().toString(),
@@ -90,7 +81,6 @@ const Index = () => {
           }
         };
         
-        // Update the old task's recurrence info
         const oldTaskIndex = updatedTasks.findIndex(t => t.id === task.id);
         if (oldTaskIndex !== -1) {
           updatedTasks[oldTaskIndex] = {
@@ -102,7 +92,6 @@ const Index = () => {
           };
         }
         
-        // Add the new task
         updatedTasks.push(newTask);
         tasksChanged = true;
         
@@ -118,16 +107,13 @@ const Index = () => {
     }
   }, [tasks, toast]);
   
-  // Filter for tasks based on user selection
   const filteredTasks = tasks.filter(task => {
-    // Filter for due tasks if enabled
     if (showDueOnly) {
       if (task.completed) return false;
       if (!task.spacedRepetition?.nextReview) return false;
       return isAfter(new Date(), new Date(task.spacedRepetition.nextReview));
     }
     
-    // Filter for recurring tasks if enabled
     if (showRecurringOnly) {
       return !!task.recurrence;
     }
@@ -135,7 +121,6 @@ const Index = () => {
     return true;
   });
 
-  // Sort tasks for interleaving if enabled
   const processedTasks = interleavingMode 
     ? interleaveTasksBySubject(filteredTasks) 
     : filteredTasks;
@@ -192,14 +177,11 @@ const Index = () => {
     }
   };
   
-  // Function to interleave tasks by subject
   function interleaveTasksBySubject(tasks: Task[]): Task[] {
-    // Only include tasks marked for interleaving or with spaced repetition
     const interleavableTasks = tasks.filter(task => 
       (task.interleaving || task.spacedRepetition) && !task.completed
     );
     
-    // Group tasks by subject
     const subjectGroups: Record<string, Task[]> = {};
     
     interleavableTasks.forEach(task => {
@@ -210,7 +192,6 @@ const Index = () => {
       subjectGroups[subject].push(task);
     });
     
-    // Create interleaved list
     const interleaved: Task[] = [];
     let hasMoreTasks = true;
     let index = 0;
@@ -230,7 +211,6 @@ const Index = () => {
       index++;
     }
     
-    // Add the non-interleaving tasks back
     const nonInterleavableTasks = tasks.filter(task => 
       !task.interleaving && !task.spacedRepetition
     );
@@ -238,46 +218,39 @@ const Index = () => {
     return [...interleaved, ...nonInterleavableTasks];
   }
 
-  // Count due spaced repetition tasks
   const dueTasksCount = tasks.filter(task => {
     if (task.completed) return false;
     if (!task.spacedRepetition?.nextReview) return false;
     return isAfter(new Date(), new Date(task.spacedRepetition.nextReview));
   }).length;
   
-  // Count recurring tasks
   const recurringTasksCount = tasks.filter(task => !!task.recurrence).length;
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
-      <main className="container mx-auto px-4 py-6">
-        <div className="flex items-center justify-between mb-6">
+      <main className="container mx-auto px-4 py-8">
+        <div className="flex items-center justify-between mb-8">
           <Tabs 
             value={activeTab} 
             onValueChange={setActiveTab}
             className="w-full"
           >
-            <div className="flex items-center justify-between mb-4">
-              <TabsList>
-                <TabsTrigger value="matrix" className="flex items-center gap-1">
-                  <div className="grid grid-cols-2 grid-rows-2 w-4 h-4 gap-0.5">
-                    <div className="bg-matrix-q1 rounded-sm"></div>
-                    <div className="bg-matrix-q2 rounded-sm"></div>
-                    <div className="bg-matrix-q3 rounded-sm"></div>
-                    <div className="bg-matrix-q4 rounded-sm"></div>
-                  </div>
-                  <span>Eisenhower Matrix</span>
+            <div className="flex items-center justify-between mb-6">
+              <TabsList className="p-1">
+                <TabsTrigger value="matrix" className="flex items-center gap-2 px-4 py-2.5">
+                  <Grid2X2 className="h-5 w-5" />
+                  <span className="text-base font-medium">Eisenhower Matrix</span>
                 </TabsTrigger>
-                <TabsTrigger value="analysis" className="flex items-center gap-1">
-                  <BarChart3 className="h-4 w-4" />
-                  <span>Analysis</span>
+                <TabsTrigger value="analysis" className="flex items-center gap-2 px-4 py-2.5">
+                  <BarChart3 className="h-5 w-5" />
+                  <span className="text-base font-medium">Analysis</span>
                 </TabsTrigger>
               </TabsList>
               
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium">Total Points:</span>
-                <span className="text-lg font-bold text-amber-600">{totalPoints}</span>
+              <div className="flex items-center gap-3 bg-white px-5 py-3 rounded-lg shadow-sm border border-gray-100">
+                <span className="text-base font-medium text-gray-600">Total Points:</span>
+                <span className={`text-xl font-bold ${getPointsColor(totalPoints)}`}>{totalPoints}</span>
               </div>
             </div>
             
@@ -291,7 +264,7 @@ const Index = () => {
                       setShowDueOnly(!showDueOnly);
                       if (!showDueOnly) setShowRecurringOnly(false);
                     }}
-                    className="flex items-center gap-1"
+                    className="flex items-center gap-1 px-4 py-2 rounded-md"
                   >
                     <Brain className="h-4 w-4" />
                     <span>Due for Review ({dueTasksCount})</span>
@@ -301,7 +274,7 @@ const Index = () => {
                     size="sm"
                     variant={interleavingMode ? "default" : "outline"}
                     onClick={() => setInterleavingMode(!interleavingMode)}
-                    className="flex items-center gap-1"
+                    className="flex items-center gap-1 px-4 py-2 rounded-md"
                   >
                     <Shuffle className="h-4 w-4" />
                     <span>Interleaving Mode</span>
@@ -314,7 +287,7 @@ const Index = () => {
                       setShowRecurringOnly(!showRecurringOnly);
                       if (!showRecurringOnly) setShowDueOnly(false);
                     }}
-                    className="flex items-center gap-1"
+                    className="flex items-center gap-1 px-4 py-2 rounded-md"
                   >
                     <Repeat className="h-4 w-4" />
                     <span>Recurring Tasks ({recurringTasksCount})</span>

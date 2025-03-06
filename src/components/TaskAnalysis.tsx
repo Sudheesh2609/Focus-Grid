@@ -1,11 +1,9 @@
-
 import { useState, useMemo } from "react";
 import { Task, AnalysisPeriod, TaskAnalytics } from "@/types/task";
 import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -48,7 +46,9 @@ import {
   endOfYear,
   isWithinInterval,
   parseISO,
+  format,
 } from "date-fns";
+import { getPointsColor } from "@/utils/points";
 
 interface TaskAnalysisProps {
   tasks: Task[];
@@ -58,7 +58,6 @@ const TaskAnalysis = ({ tasks }: TaskAnalysisProps) => {
   const { toast } = useToast();
   const [period, setPeriod] = useState<AnalysisPeriod>("weekly");
 
-  // Get date range based on selected period
   const getDateRange = (period: AnalysisPeriod) => {
     const now = new Date();
     
@@ -86,11 +85,9 @@ const TaskAnalysis = ({ tasks }: TaskAnalysisProps) => {
     }
   };
 
-  // Filter tasks based on date range and calculate analytics
   const analytics = useMemo((): TaskAnalytics => {
     const range = getDateRange(period);
     
-    // Filter tasks that were completed within the date range
     const filteredTasks = tasks.filter((task) => {
       if (!task.completedAt) return false;
       
@@ -101,7 +98,6 @@ const TaskAnalysis = ({ tasks }: TaskAnalysisProps) => {
       });
     });
     
-    // Count pending tasks within the date range
     const pendingTasks = tasks.filter((task) => {
       if (task.completed) return false;
       
@@ -112,7 +108,6 @@ const TaskAnalysis = ({ tasks }: TaskAnalysisProps) => {
       });
     }).length;
     
-    // Initial analytics structure
     const initialAnalytics: TaskAnalytics = {
       completedTasks: filteredTasks.length,
       pendingTasks,
@@ -131,16 +126,12 @@ const TaskAnalysis = ({ tasks }: TaskAnalysisProps) => {
       },
     };
     
-    // Calculate analytics from filtered tasks
     return filteredTasks.reduce((analytics, task) => {
-      // Add task points to total
       const taskPoints = task.points || 0;
       analytics.totalPoints += taskPoints;
       
-      // Add task points by quadrant
       analytics.pointsByQuadrant[task.quadrant] += taskPoints;
       
-      // Count tasks by quadrant
       analytics.tasksByQuadrant[task.quadrant]++;
       
       return analytics;
@@ -156,43 +147,53 @@ const TaskAnalysis = ({ tasks }: TaskAnalysisProps) => {
     });
   };
 
-  // Prepare data for charts
   const quadrantData = [
     {
       name: "Urgent & Important",
       points: analytics.pointsByQuadrant.q1,
       tasks: analytics.tasksByQuadrant.q1,
-      color: "#ef4444", // Red for Q1
+      color: "#ef4444",
     },
     {
       name: "Important & Not Urgent",
       points: analytics.pointsByQuadrant.q2,
       tasks: analytics.tasksByQuadrant.q2,
-      color: "#3b82f6", // Blue for Q2
+      color: "#3b82f6",
     },
     {
       name: "Urgent & Not Important",
       points: analytics.pointsByQuadrant.q3,
       tasks: analytics.tasksByQuadrant.q3,
-      color: "#f59e0b", // Yellow for Q3
+      color: "#f59e0b",
     },
     {
       name: "Not Urgent & Not Important",
       points: analytics.pointsByQuadrant.q4,
       tasks: analytics.tasksByQuadrant.q4,
-      color: "#6b7280", // Gray for Q4
+      color: "#6b7280",
     },
   ];
 
+  const dateRange = useMemo(() => {
+    const range = getDateRange(period);
+    return {
+      start: format(range.start, 'MMM d'),
+      end: format(range.end, 'MMM d, yyyy')
+    };
+  }, [period]);
+
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Task Analysis</h2>
+    <div className="space-y-8 animate-fade-in">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h2 className="text-3xl font-bold text-gray-800">Task Analysis</h2>
+          <p className="text-gray-500">{dateRange.start} - {dateRange.end}</p>
+        </div>
         <Select
           value={period}
           onValueChange={(value) => handlePeriodChange(value as AnalysisPeriod)}
         >
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger className="w-[180px] bg-white">
             <SelectValue placeholder="Select period" />
           </SelectTrigger>
           <SelectContent>
@@ -205,59 +206,61 @@ const TaskAnalysis = ({ tasks }: TaskAnalysisProps) => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
+        <Card className="bg-white hover:shadow-md transition-shadow">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center">
-              <Trophy className="mr-2 h-4 w-4 text-amber-500" />
+            <CardTitle className="text-sm font-medium flex items-center text-gray-600">
+              <Trophy className="mr-2 h-5 w-5 text-amber-500" />
               Total Points
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{analytics.totalPoints}</div>
+            <div className={`text-3xl font-bold ${getPointsColor(analytics.totalPoints)}`}>
+              {analytics.totalPoints}
+            </div>
           </CardContent>
         </Card>
         
-        <Card>
+        <Card className="bg-white hover:shadow-md transition-shadow">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center">
-              <CheckCircle className="mr-2 h-4 w-4 text-green-500" />
+            <CardTitle className="text-sm font-medium flex items-center text-gray-600">
+              <CheckCircle className="mr-2 h-5 w-5 text-green-500" />
               Completed Tasks
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{analytics.completedTasks}</div>
+            <div className="text-3xl font-bold text-gray-800">{analytics.completedTasks}</div>
           </CardContent>
         </Card>
         
-        <Card>
+        <Card className="bg-white hover:shadow-md transition-shadow">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center">
-              <Clock className="mr-2 h-4 w-4 text-orange-500" />
+            <CardTitle className="text-sm font-medium flex items-center text-gray-600">
+              <Clock className="mr-2 h-5 w-5 text-orange-500" />
               Pending Tasks
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{analytics.pendingTasks}</div>
+            <div className="text-3xl font-bold text-gray-800">{analytics.pendingTasks}</div>
           </CardContent>
         </Card>
         
-        <Card>
+        <Card className="bg-white hover:shadow-md transition-shadow">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center">
-              <Calendar className="mr-2 h-4 w-4 text-blue-500" />
+            <CardTitle className="text-sm font-medium flex items-center text-gray-600">
+              <Calendar className="mr-2 h-5 w-5 text-blue-500" />
               Period
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold capitalize">{period}</div>
+            <div className="text-3xl font-bold text-gray-800 capitalize">{period}</div>
           </CardContent>
         </Card>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card>
+        <Card className="bg-white hover:shadow-md transition-shadow">
           <CardHeader>
-            <CardTitle className="flex items-center">
+            <CardTitle className="flex items-center text-xl font-semibold text-gray-800">
               <BarChartIcon className="mr-2 h-5 w-5" />
               Points by Quadrant
             </CardTitle>
@@ -272,12 +275,19 @@ const TaskAnalysis = ({ tasks }: TaskAnalysisProps) => {
                   data={quadrantData}
                   margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
                 >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip />
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                  <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 12 }} />
+                  <Tooltip
+                    contentStyle={{ 
+                      backgroundColor: 'white',
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                      border: 'none'
+                    }}
+                  />
                   <Legend />
-                  <Bar dataKey="points" name="Points" fill="#3b82f6">
+                  <Bar dataKey="points" name="Points" fill="#3b82f6" radius={[4, 4, 0, 0]}>
                     {quadrantData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
@@ -288,9 +298,9 @@ const TaskAnalysis = ({ tasks }: TaskAnalysisProps) => {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-white hover:shadow-md transition-shadow">
           <CardHeader>
-            <CardTitle>Tasks by Quadrant</CardTitle>
+            <CardTitle className="text-xl font-semibold text-gray-800">Tasks by Quadrant</CardTitle>
             <CardDescription>
               Distribution of tasks across the Eisenhower matrix
             </CardDescription>
@@ -304,9 +314,11 @@ const TaskAnalysis = ({ tasks }: TaskAnalysisProps) => {
                     cx="50%"
                     cy="50%"
                     labelLine={true}
-                    outerRadius={80}
+                    outerRadius={110}
+                    innerRadius={60}
                     fill="#8884d8"
                     dataKey="tasks"
+                    paddingAngle={2}
                     label={({ name, percent }) =>
                       `${name}: ${(percent * 100).toFixed(0)}%`
                     }
@@ -315,7 +327,14 @@ const TaskAnalysis = ({ tasks }: TaskAnalysisProps) => {
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip />
+                  <Tooltip
+                    contentStyle={{ 
+                      backgroundColor: 'white',
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                      border: 'none'
+                    }}
+                  />
                   <Legend />
                 </PieChart>
               </ResponsiveContainer>
