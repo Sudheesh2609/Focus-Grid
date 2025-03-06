@@ -1,10 +1,11 @@
 
 import { useState } from "react";
 import { Task, TaskQuadrant } from "@/types/task";
-import { Pencil, Trash2, Check } from "lucide-react";
+import { Pencil, Trash2, Timer as TimerIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import TaskForm from "@/components/TaskForm";
+import PomodoroTimer from "@/components/PomodoroTimer";
 
 interface TaskItemProps {
   task: Task;
@@ -15,6 +16,7 @@ interface TaskItemProps {
 
 const TaskItem = ({ task, onUpdate, onDelete, quadrant }: TaskItemProps) => {
   const [isEditing, setIsEditing] = useState(false);
+  const [showTimer, setShowTimer] = useState(false);
 
   const handleToggleComplete = () => {
     onUpdate({
@@ -30,6 +32,15 @@ const TaskItem = ({ task, onUpdate, onDelete, quadrant }: TaskItemProps) => {
       quadrant, // Ensure the quadrant doesn't change during edit
     });
     setIsEditing(false);
+  };
+
+  const handleTimerComplete = () => {
+    if (!task.completed) {
+      onUpdate({
+        ...task,
+        completed: true,
+      });
+    }
   };
 
   const getQuadrantColor = () => {
@@ -58,43 +69,64 @@ const TaskItem = ({ task, onUpdate, onDelete, quadrant }: TaskItemProps) => {
   }
 
   return (
-    <div className={`flex items-start gap-2 p-3 rounded-md bg-white shadow-sm border transition-all ${task.completed ? 'opacity-70' : ''}`}>
-      <Checkbox
-        checked={task.completed}
-        onCheckedChange={handleToggleComplete}
-        className={`mt-1 ${getQuadrantColor()}`}
-      />
-      
-      <div className="flex-1 min-w-0">
-        <h3 className={`font-medium ${task.completed ? 'line-through text-gray-500' : ''}`}>
-          {task.title}
-        </h3>
-        {task.description && (
-          <p className={`text-sm mt-1 text-gray-600 ${task.completed ? 'line-through text-gray-400' : ''}`}>
-            {task.description}
-          </p>
-        )}
-      </div>
-      
-      <div className="flex gap-1 ml-2">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8"
-          onClick={() => setIsEditing(true)}
-        >
-          <Pencil className="h-4 w-4" />
-        </Button>
+    <div className={`flex flex-col gap-2 p-3 rounded-md bg-white shadow-sm border transition-all ${task.completed ? 'opacity-70' : ''}`}>
+      <div className="flex items-start gap-2">
+        <Checkbox
+          checked={task.completed}
+          onCheckedChange={handleToggleComplete}
+          className={`mt-1 ${getQuadrantColor()}`}
+        />
         
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 text-destructive hover:text-destructive"
-          onClick={() => onDelete(task.id)}
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
+        <div className="flex-1 min-w-0">
+          <h3 className={`font-medium ${task.completed ? 'line-through text-gray-500' : ''}`}>
+            {task.title}
+          </h3>
+          {task.description && (
+            <p className={`text-sm mt-1 text-gray-600 ${task.completed ? 'line-through text-gray-400' : ''}`}>
+              {task.description}
+            </p>
+          )}
+        </div>
+        
+        <div className="flex gap-1 ml-2">
+          {task.pomodoro && !task.completed && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setShowTimer(!showTimer)}
+            >
+              <TimerIcon className="h-4 w-4" />
+            </Button>
+          )}
+          
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setIsEditing(true)}
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+          
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-destructive hover:text-destructive"
+            onClick={() => onDelete(task.id)}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
+      
+      {showTimer && task.pomodoro && !task.completed && (
+        <PomodoroTimer 
+          settings={task.pomodoro} 
+          onComplete={handleTimerComplete}
+          className="mt-2 pt-2 border-t"
+        />
+      )}
     </div>
   );
 };
