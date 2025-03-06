@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Task, TaskQuadrant } from "@/types/task";
 import { Pencil, Trash2, Timer as TimerIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,8 +17,49 @@ interface TaskItemProps {
 const TaskItem = ({ task, onUpdate, onDelete, quadrant }: TaskItemProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [showTimer, setShowTimer] = useState(false);
+  
+  // Sound references
+  const checkSoundRef = useRef<HTMLAudioElement | null>(null);
+  const editSoundRef = useRef<HTMLAudioElement | null>(null);
+  const deleteSoundRef = useRef<HTMLAudioElement | null>(null);
+  const timerToggleSoundRef = useRef<HTMLAudioElement | null>(null);
+
+  // Initialize audio elements
+  useEffect(() => {
+    checkSoundRef.current = new Audio("/sounds/check.mp3");
+    editSoundRef.current = new Audio("/sounds/edit.mp3");
+    deleteSoundRef.current = new Audio("/sounds/delete.mp3");
+    timerToggleSoundRef.current = new Audio("/sounds/timer-toggle.mp3");
+    
+    // Preload sounds
+    [checkSoundRef, editSoundRef, deleteSoundRef, timerToggleSoundRef].forEach(ref => {
+      if (ref.current) {
+        ref.current.load();
+      }
+    });
+    
+    return () => {
+      // Cleanup
+      [checkSoundRef, editSoundRef, deleteSoundRef, timerToggleSoundRef].forEach(ref => {
+        if (ref.current) {
+          ref.current.pause();
+          ref.current.currentTime = 0;
+        }
+      });
+    };
+  }, []);
+
+  const playSound = (soundRef: React.RefObject<HTMLAudioElement>) => {
+    if (soundRef.current) {
+      soundRef.current.currentTime = 0;
+      soundRef.current.play().catch(error => {
+        console.error("Error playing sound:", error);
+      });
+    }
+  };
 
   const handleToggleComplete = () => {
+    playSound(checkSoundRef);
     onUpdate({
       ...task,
       completed: !task.completed,
@@ -36,11 +77,27 @@ const TaskItem = ({ task, onUpdate, onDelete, quadrant }: TaskItemProps) => {
 
   const handleTimerComplete = () => {
     if (!task.completed) {
+      playSound(checkSoundRef);
       onUpdate({
         ...task,
         completed: true,
       });
     }
+  };
+
+  const handleEditClick = () => {
+    playSound(editSoundRef);
+    setIsEditing(true);
+  };
+
+  const handleDeleteClick = () => {
+    playSound(deleteSoundRef);
+    onDelete(task.id);
+  };
+
+  const handleTimerToggle = () => {
+    playSound(timerToggleSoundRef);
+    setShowTimer(!showTimer);
   };
 
   const getQuadrantColor = () => {
@@ -94,7 +151,7 @@ const TaskItem = ({ task, onUpdate, onDelete, quadrant }: TaskItemProps) => {
               variant="ghost"
               size="icon"
               className="h-8 w-8"
-              onClick={() => setShowTimer(!showTimer)}
+              onClick={handleTimerToggle}
             >
               <TimerIcon className="h-4 w-4" />
             </Button>
@@ -104,7 +161,7 @@ const TaskItem = ({ task, onUpdate, onDelete, quadrant }: TaskItemProps) => {
             variant="ghost"
             size="icon"
             className="h-8 w-8"
-            onClick={() => setIsEditing(true)}
+            onClick={handleEditClick}
           >
             <Pencil className="h-4 w-4" />
           </Button>
@@ -113,7 +170,7 @@ const TaskItem = ({ task, onUpdate, onDelete, quadrant }: TaskItemProps) => {
             variant="ghost"
             size="icon"
             className="h-8 w-8 text-destructive hover:text-destructive"
-            onClick={() => onDelete(task.id)}
+            onClick={handleDeleteClick}
           >
             <Trash2 className="h-4 w-4" />
           </Button>

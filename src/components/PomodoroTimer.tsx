@@ -27,12 +27,55 @@ const PomodoroTimer = ({ settings, onComplete, className }: PomodoroTimerProps) 
   const [secondsLeft, setSecondsLeft] = useState(settings.workDuration * 60);
   const [currentSession, setCurrentSession] = useState(1);
   const intervalRef = useRef<number | null>(null);
+  
+  // Sound references
+  const clickSoundRef = useRef<HTMLAudioElement | null>(null);
+  const startSoundRef = useRef<HTMLAudioElement | null>(null);
+  const pauseSoundRef = useRef<HTMLAudioElement | null>(null);
+  const resetSoundRef = useRef<HTMLAudioElement | null>(null);
+  const completeSoundRef = useRef<HTMLAudioElement | null>(null);
+
+  // Initialize audio elements
+  useEffect(() => {
+    clickSoundRef.current = new Audio("/sounds/click.mp3");
+    startSoundRef.current = new Audio("/sounds/start.mp3");
+    pauseSoundRef.current = new Audio("/sounds/pause.mp3");
+    resetSoundRef.current = new Audio("/sounds/reset.mp3");
+    completeSoundRef.current = new Audio("/sounds/complete.mp3");
+    
+    // Preload sounds
+    [clickSoundRef, startSoundRef, pauseSoundRef, resetSoundRef, completeSoundRef].forEach(ref => {
+      if (ref.current) {
+        ref.current.load();
+      }
+    });
+    
+    return () => {
+      // Cleanup
+      [clickSoundRef, startSoundRef, pauseSoundRef, resetSoundRef, completeSoundRef].forEach(ref => {
+        if (ref.current) {
+          ref.current.pause();
+          ref.current.currentTime = 0;
+        }
+      });
+    };
+  }, []);
+
+  const playSound = (soundRef: React.RefObject<HTMLAudioElement>) => {
+    if (soundRef.current) {
+      soundRef.current.currentTime = 0;
+      soundRef.current.play().catch(error => {
+        console.error("Error playing sound:", error);
+      });
+    }
+  };
 
   const resetTimer = () => {
     setIsActive(false);
     setMode("work");
     setSecondsLeft(settings.workDuration * 60);
     setCurrentSession(1);
+    playSound(resetSoundRef);
     
     if (intervalRef.current) {
       window.clearInterval(intervalRef.current);
@@ -41,7 +84,14 @@ const PomodoroTimer = ({ settings, onComplete, className }: PomodoroTimerProps) 
   };
 
   const toggleTimer = () => {
-    setIsActive(!isActive);
+    const newIsActive = !isActive;
+    setIsActive(newIsActive);
+    
+    if (newIsActive) {
+      playSound(startSoundRef);
+    } else {
+      playSound(pauseSoundRef);
+    }
   };
 
   useEffect(() => {
@@ -51,6 +101,9 @@ const PomodoroTimer = ({ settings, onComplete, className }: PomodoroTimerProps) 
           if (prevSeconds <= 1) {
             // Time's up!
             const isWorkMode = mode === "work";
+            
+            // Play completion sound
+            playSound(completeSoundRef);
             
             // Show toast notification
             toast({
@@ -80,6 +133,12 @@ const PomodoroTimer = ({ settings, onComplete, className }: PomodoroTimerProps) 
               return settings.workDuration * 60;
             }
           }
+          
+          // Play tick sound on every 15 seconds mark if timer is running
+          if (prevSeconds % 15 === 0) {
+            playSound(clickSoundRef);
+          }
+          
           return prevSeconds - 1;
         });
       }, 1000);
