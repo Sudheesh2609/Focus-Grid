@@ -1,12 +1,12 @@
-
 import { useState, useRef, useEffect } from "react";
 import { Task, TaskQuadrant } from "@/types/task";
-import { Pencil, Trash2, Timer as TimerIcon, Brain, Shuffle, Clock } from "lucide-react";
+import { Pencil, Trash2, Timer as TimerIcon, Brain, Shuffle, Clock, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import TaskForm from "@/components/TaskForm";
 import PomodoroTimer from "@/components/PomodoroTimer";
+import ActiveRecall from "@/components/ActiveRecall";
 import { format, isAfter } from "date-fns";
 
 interface TaskItemProps {
@@ -19,6 +19,7 @@ interface TaskItemProps {
 const TaskItem = ({ task, onUpdate, onDelete, quadrant }: TaskItemProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [showTimer, setShowTimer] = useState(false);
+  const [showActiveRecall, setShowActiveRecall] = useState(false);
   
   // Sound references
   const checkSoundRef = useRef<HTMLAudioElement | null>(null);
@@ -105,6 +106,13 @@ const TaskItem = ({ task, onUpdate, onDelete, quadrant }: TaskItemProps) => {
     setIsEditing(false);
   };
 
+  const handleUpdateActiveRecallCards = (cards: ActiveRecallCard[]) => {
+    onUpdate({
+      ...task,
+      activeRecall: cards.length > 0 ? cards : undefined
+    });
+  };
+
   const handleTimerComplete = () => {
     if (!task.completed) {
       playSound(checkSoundRef);
@@ -128,6 +136,11 @@ const TaskItem = ({ task, onUpdate, onDelete, quadrant }: TaskItemProps) => {
   const handleTimerToggle = () => {
     playSound(timerToggleSoundRef);
     setShowTimer(!showTimer);
+  };
+
+  const handleActiveRecallToggle = () => {
+    playSound(timerToggleSoundRef);
+    setShowActiveRecall(!showActiveRecall);
   };
 
   const getQuadrantColor = () => {
@@ -201,10 +214,28 @@ const TaskItem = ({ task, onUpdate, onDelete, quadrant }: TaskItemProps) => {
                 <span>Next: {format(new Date(task.spacedRepetition.nextReview), 'MMM d')}</span>
               </Badge>
             )}
+            
+            {task.activeRecall && task.activeRecall.length > 0 && (
+              <Badge variant="outline" className="text-xs px-1 py-0 bg-indigo-50 border-indigo-200 flex items-center gap-0.5">
+                <BookOpen className="h-2.5 w-2.5" />
+                <span>Cards: {task.activeRecall.length}</span>
+              </Badge>
+            )}
           </div>
         </div>
         
         <div className="flex gap-1 ml-2">
+          {task.activeRecall && task.activeRecall.length > 0 && !task.completed && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={handleActiveRecallToggle}
+            >
+              <BookOpen className="h-4 w-4" />
+            </Button>
+          )}
+          
           {task.pomodoro && !task.completed && (
             <Button
               variant="ghost"
@@ -240,6 +271,14 @@ const TaskItem = ({ task, onUpdate, onDelete, quadrant }: TaskItemProps) => {
         <PomodoroTimer 
           settings={task.pomodoro} 
           onComplete={handleTimerComplete}
+          className="mt-2 pt-2 border-t"
+        />
+      )}
+      
+      {showActiveRecall && task.activeRecall && task.activeRecall.length > 0 && !task.completed && (
+        <ActiveRecall 
+          cards={task.activeRecall}
+          onUpdate={handleUpdateActiveRecallCards} 
           className="mt-2 pt-2 border-t"
         />
       )}

@@ -15,6 +15,12 @@ export interface SpacedRepetition {
   repetitionCount: number; // Number of times reviewed
 }
 
+export interface ActiveRecallCard {
+  question: string;
+  answer: string;
+  lastPerformance: 'correct' | 'incorrect' | null; // How well the student recalled this card
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -26,4 +32,5 @@ export interface Task {
   spacedRepetition?: SpacedRepetition;
   interleaving?: boolean; // Whether this task should be interleaved with others
   subject?: string; // Subject category for interleaving
+  activeRecall?: ActiveRecallCard[]; // Cards for active recall practice
 }

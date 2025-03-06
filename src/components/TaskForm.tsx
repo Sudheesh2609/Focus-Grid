@@ -1,10 +1,9 @@
-
 import { useState } from "react";
-import { Task, PomodoroSettings, SpacedRepetition } from "@/types/task";
+import { Task, PomodoroSettings, SpacedRepetition, ActiveRecallCard } from "@/types/task";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Timer, Brain, Shuffle } from "lucide-react";
+import { Timer, Brain, Shuffle, BookOpen } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { addDays, format } from "date-fns";
@@ -46,6 +45,14 @@ const TaskForm = ({ task, onSubmit, onCancel }: TaskFormProps) => {
   
   // Interleaving setting
   const [interleaving, setInterleaving] = useState(task?.interleaving || false);
+  
+  // Active recall settings
+  const [showActiveRecall, setShowActiveRecall] = useState(!!task?.activeRecall);
+  const [activeRecallQuestion, setActiveRecallQuestion] = useState("");
+  const [activeRecallAnswer, setActiveRecallAnswer] = useState("");
+  const [activeRecallCards, setActiveRecallCards] = useState<ActiveRecallCard[]>(
+    task?.activeRecall || []
+  );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,6 +77,7 @@ const TaskForm = ({ task, onSubmit, onCancel }: TaskFormProps) => {
         nextReview: nextReviewDate,
       } : undefined,
       interleaving: interleaving || undefined,
+      activeRecall: showActiveRecall && activeRecallCards.length > 0 ? activeRecallCards : undefined,
     });
     
     setTitle("");
@@ -80,6 +88,8 @@ const TaskForm = ({ task, onSubmit, onCancel }: TaskFormProps) => {
     setInterleaving(false);
     setShowPomodoroSettings(false);
     setShowSpacedRepetition(false);
+    setShowActiveRecall(false);
+    setActiveRecallCards([]);
   };
 
   const handlePomodoroChange = (field: keyof PomodoroSettings, value: string) => {
@@ -100,6 +110,28 @@ const TaskForm = ({ task, onSubmit, onCancel }: TaskFormProps) => {
       ...spacedRepetition,
       interval: numValue,
     });
+  };
+  
+  const handleAddActiveRecallCard = () => {
+    if (!activeRecallQuestion.trim() || !activeRecallAnswer.trim()) return;
+    
+    setActiveRecallCards([
+      ...activeRecallCards,
+      {
+        question: activeRecallQuestion.trim(),
+        answer: activeRecallAnswer.trim(),
+        lastPerformance: null
+      }
+    ]);
+    
+    setActiveRecallQuestion("");
+    setActiveRecallAnswer("");
+  };
+  
+  const handleRemoveActiveRecallCard = (index: number) => {
+    const newCards = [...activeRecallCards];
+    newCards.splice(index, 1);
+    setActiveRecallCards(newCards);
   };
 
   return (
@@ -128,7 +160,7 @@ const TaskForm = ({ task, onSubmit, onCancel }: TaskFormProps) => {
       />
       
       <div className="flex flex-col gap-2">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <Button 
             type="button" 
             variant="ghost" 
@@ -149,6 +181,17 @@ const TaskForm = ({ task, onSubmit, onCancel }: TaskFormProps) => {
           >
             <Brain className="h-3.5 w-3.5" />
             {showSpacedRepetition ? "Hide Spaced Repetition" : "Add Spaced Repetition"}
+          </Button>
+          
+          <Button 
+            type="button" 
+            variant="ghost" 
+            size="sm"
+            className="text-xs flex items-center gap-1"
+            onClick={() => setShowActiveRecall(!showActiveRecall)}
+          >
+            <BookOpen className="h-3.5 w-3.5" />
+            {showActiveRecall ? "Hide Active Recall" : "Add Active Recall"}
           </Button>
         </div>
         
@@ -223,6 +266,63 @@ const TaskForm = ({ task, onSubmit, onCancel }: TaskFormProps) => {
               ? format(new Date(spacedRepetition.nextReview), 'MMM d, yyyy') 
               : format(addDays(new Date(), spacedRepetition.interval), 'MMM d, yyyy')}
           </p>
+        </div>
+      )}
+      
+      {showActiveRecall && (
+        <div className="p-2 bg-gray-50 rounded-md space-y-2">
+          <p className="text-xs font-medium flex items-center gap-1 mb-2">
+            <BookOpen className="h-3.5 w-3.5" />
+            Active Recall Cards ({activeRecallCards.length})
+          </p>
+          
+          {activeRecallCards.length > 0 && (
+            <div className="space-y-2 mb-3">
+              {activeRecallCards.map((card, index) => (
+                <div key={index} className="flex justify-between items-center p-2 bg-white rounded border text-sm">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium truncate">{card.question}</div>
+                    <div className="text-gray-500 truncate text-xs">{card.answer}</div>
+                  </div>
+                  <Button 
+                    type="button" 
+                    variant="ghost" 
+                    size="sm" 
+                    className="text-destructive" 
+                    onClick={() => handleRemoveActiveRecallCard(index)}
+                  >
+                    Remove
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          <div className="space-y-2">
+            <Input
+              placeholder="Question"
+              value={activeRecallQuestion}
+              onChange={(e) => setActiveRecallQuestion(e.target.value)}
+              className="text-sm"
+            />
+            <Textarea
+              placeholder="Answer"
+              value={activeRecallAnswer}
+              onChange={(e) => setActiveRecallAnswer(e.target.value)}
+              className="text-sm"
+              rows={2}
+            />
+            <Button 
+              type="button" 
+              variant="outline" 
+              size="sm" 
+              onClick={handleAddActiveRecallCard}
+              disabled={!activeRecallQuestion.trim() || !activeRecallAnswer.trim()}
+              className="w-full"
+            >
+              Add Card
+            </Button>
+          </div>
         </div>
       )}
       
