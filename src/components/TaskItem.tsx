@@ -1,11 +1,13 @@
-
 import { useState, useRef, useEffect } from "react";
 import { Task, TaskQuadrant } from "@/types/task";
-import { Pencil, Trash2, Timer as TimerIcon } from "lucide-react";
+import { Pencil, Trash2, Timer as TimerIcon, Brain, Shuffle, Clock, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import TaskForm from "@/components/TaskForm";
 import PomodoroTimer from "@/components/PomodoroTimer";
+import ActiveRecall from "@/components/ActiveRecall";
+import { format, isAfter } from "date-fns";
 
 interface TaskItemProps {
   task: Task;
@@ -17,12 +19,18 @@ interface TaskItemProps {
 const TaskItem = ({ task, onUpdate, onDelete, quadrant }: TaskItemProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [showTimer, setShowTimer] = useState(false);
+  const [showActiveRecall, setShowActiveRecall] = useState(false);
   
   // Sound references
   const checkSoundRef = useRef<HTMLAudioElement | null>(null);
   const editSoundRef = useRef<HTMLAudioElement | null>(null);
   const deleteSoundRef = useRef<HTMLAudioElement | null>(null);
   const timerToggleSoundRef = useRef<HTMLAudioElement | null>(null);
+
+  // Check for due spaced repetition items
+  const isDueForReview = task.spacedRepetition?.nextReview && 
+    isAfter(new Date(), new Date(task.spacedRepetition.nextReview)) && 
+    !task.completed;
 
   // Initialize audio elements
   useEffect(() => {
@@ -60,10 +68,33 @@ const TaskItem = ({ task, onUpdate, onDelete, quadrant }: TaskItemProps) => {
 
   const handleToggleComplete = () => {
     playSound(checkSoundRef);
-    onUpdate({
-      ...task,
-      completed: !task.completed,
-    });
+    
+    // If this is a spaced repetition task and marked as complete
+    if (task.spacedRepetition && !task.completed) {
+      // Calculate new interval using a simple spaced repetition algorithm
+      // Double the interval each successful review
+      const newInterval = task.spacedRepetition.interval * 2;
+      const now = new Date();
+      const nextReview = new Date();
+      nextReview.setDate(now.getDate() + newInterval);
+      
+      onUpdate({
+        ...task,
+        completed: true,
+        spacedRepetition: {
+          ...task.spacedRepetition,
+          interval: newInterval,
+          lastReviewed: now.toISOString(),
+          nextReview: nextReview.toISOString(),
+          repetitionCount: task.spacedRepetition.repetitionCount + 1
+        }
+      });
+    } else {
+      onUpdate({
+        ...task,
+        completed: !task.completed,
+      });
+    }
   };
 
   const handleUpdateTask = (updatedTaskData: Omit<Task, "id">) => {
@@ -73,6 +104,13 @@ const TaskItem = ({ task, onUpdate, onDelete, quadrant }: TaskItemProps) => {
       quadrant, // Ensure the quadrant doesn't change during edit
     });
     setIsEditing(false);
+  };
+
+  const handleUpdateActiveRecallCards = (cards: ActiveRecallCard[]) => {
+    onUpdate({
+      ...task,
+      activeRecall: cards.length > 0 ? cards : undefined
+    });
   };
 
   const handleTimerComplete = () => {
@@ -98,6 +136,11 @@ const TaskItem = ({ task, onUpdate, onDelete, quadrant }: TaskItemProps) => {
   const handleTimerToggle = () => {
     playSound(timerToggleSoundRef);
     setShowTimer(!showTimer);
+  };
+
+  const handleActiveRecallToggle = () => {
+    playSound(timerToggleSoundRef);
+    setShowActiveRecall(!showActiveRecall);
   };
 
   const getQuadrantColor = () => {
@@ -126,7 +169,7 @@ const TaskItem = ({ task, onUpdate, onDelete, quadrant }: TaskItemProps) => {
   }
 
   return (
-    <div className={`flex flex-col gap-2 p-3 rounded-md bg-white shadow-sm border transition-all ${task.completed ? 'opacity-70' : ''}`}>
+    <div className={`flex flex-col gap-2 p-3 rounded-md bg-white shadow-sm border transition-all ${isDueForReview ? 'border-yellow-400 bg-yellow-50' : ''} ${task.completed ? 'opacity-70' : ''}`}>
       <div className="flex items-start gap-2">
         <Checkbox
           checked={task.completed}
@@ -143,9 +186,56 @@ const TaskItem = ({ task, onUpdate, onDelete, quadrant }: TaskItemProps) => {
               {task.description}
             </p>
           )}
+          
+          <div className="flex flex-wrap gap-1 mt-2">
+            {task.subject && (
+              <Badge variant="outline" className="text-xs px-1 py-0">
+                {task.subject}
+              </Badge>
+            )}
+            
+            {task.interleaving && (
+              <Badge variant="outline" className="text-xs px-1 py-0 bg-purple-50 border-purple-200 flex items-center gap-0.5">
+                <Shuffle className="h-2.5 w-2.5" />
+                <span>Interleaving</span>
+              </Badge>
+            )}
+            
+            {task.spacedRepetition && (
+              <Badge variant="outline" className={`text-xs px-1 py-0 ${isDueForReview ? 'bg-yellow-100 border-yellow-300' : 'bg-blue-50 border-blue-200'} flex items-center gap-0.5`}>
+                <Brain className="h-2.5 w-2.5" />
+                <span>SR: {task.spacedRepetition.interval}d</span>
+              </Badge>
+            )}
+            
+            {task.spacedRepetition?.nextReview && !task.completed && (
+              <Badge variant="outline" className={`text-xs px-1 py-0 ${isDueForReview ? 'bg-yellow-100 border-yellow-300' : 'bg-blue-50 border-blue-200'} flex items-center gap-0.5`}>
+                <Clock className="h-2.5 w-2.5" />
+                <span>Next: {format(new Date(task.spacedRepetition.nextReview), 'MMM d')}</span>
+              </Badge>
+            )}
+            
+            {task.activeRecall && task.activeRecall.length > 0 && (
+              <Badge variant="outline" className="text-xs px-1 py-0 bg-indigo-50 border-indigo-200 flex items-center gap-0.5">
+                <BookOpen className="h-2.5 w-2.5" />
+                <span>Cards: {task.activeRecall.length}</span>
+              </Badge>
+            )}
+          </div>
         </div>
         
         <div className="flex gap-1 ml-2">
+          {task.activeRecall && task.activeRecall.length > 0 && !task.completed && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={handleActiveRecallToggle}
+            >
+              <BookOpen className="h-4 w-4" />
+            </Button>
+          )}
+          
           {task.pomodoro && !task.completed && (
             <Button
               variant="ghost"
@@ -181,6 +271,14 @@ const TaskItem = ({ task, onUpdate, onDelete, quadrant }: TaskItemProps) => {
         <PomodoroTimer 
           settings={task.pomodoro} 
           onComplete={handleTimerComplete}
+          className="mt-2 pt-2 border-t"
+        />
+      )}
+      
+      {showActiveRecall && task.activeRecall && task.activeRecall.length > 0 && !task.completed && (
+        <ActiveRecall 
+          cards={task.activeRecall}
+          onUpdate={handleUpdateActiveRecallCards} 
           className="mt-2 pt-2 border-t"
         />
       )}
